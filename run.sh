@@ -1,6 +1,6 @@
 #!/bin/sh
 
-BASE=/elasticsearch
+BASE=.
 
 # allow for memlock if enabled
 if [ "$MEMORY_LOCK" == "true" ]; then
@@ -54,7 +54,7 @@ rm -rf /elasticsearch/modules/x-pack/x-pack-ml
 if [[ $(whoami) == "root" ]]; then
     chown -R elasticsearch:elasticsearch $BASE
     chown -R elasticsearch:elasticsearch /data
-    exec su-exec elasticsearch $BASE/bin/elasticsearch $ES_EXTRA_ARGS
+    exec gosu elasticsearch $BASE/bin/elasticsearch $ES_EXTRA_ARGS
 else
     # the container's first process is not running as 'root', 
     # it does not have the rights to chown. however, we may

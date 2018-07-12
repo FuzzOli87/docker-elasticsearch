@@ -1,54 +1,41 @@
-FROM quay.io/pires/docker-jre:8u151_cpufix
-MAINTAINER pjpires@gmail.com
+FROM docker.elastic.co/elasticsearch/elasticsearch:6.3.1
+MAINTAINER fuzzoli87@gmail.com
+LABEL org.label-schema.schema-version="1.0" \
+      org.label-schema.version="6.3.1" \
+      org.label-schema.name="docker-elasticsearch" \
+      org.label-schema.description="A custom image to make ES a bit more configurable"
+
+ENV GOSU_VERSION 1.10
 
 # Export HTTP & Transport
 EXPOSE 9200 9300
 
-ENV ES_VERSION 6.3.0
-
-ENV DOWNLOAD_URL "https://artifacts.elastic.co/downloads/elasticsearch"
-ENV ES_TARBAL "${DOWNLOAD_URL}/elasticsearch-${ES_VERSION}.tar.gz"
-ENV ES_TARBALL_ASC "${DOWNLOAD_URL}/elasticsearch-${ES_VERSION}.tar.gz.asc"
-ENV GPG_KEY "46095ACC8548582C1A2699A9D27D666CD88E42B4"
-
-# Install Elasticsearch.
-RUN apk add --no-cache --update bash ca-certificates su-exec util-linux curl
-RUN apk add --no-cache -t .build-deps gnupg openssl \
-  && cd /tmp \
-  && echo "===> Install Elasticsearch..." \
-  && curl -o elasticsearch.tar.gz -Lskj "$ES_TARBAL"; \
-	if [ "$ES_TARBALL_ASC" ]; then \
-		curl -o elasticsearch.tar.gz.asc -Lskj "$ES_TARBALL_ASC"; \
-		export GNUPGHOME="$(mktemp -d)"; \
-		gpg --keyserver ha.pool.sks-keyservers.net --recv-keys "$GPG_KEY"; \
-		gpg --batch --verify elasticsearch.tar.gz.asc elasticsearch.tar.gz; \
-		rm -r "$GNUPGHOME" elasticsearch.tar.gz.asc; \
-	fi; \
-  tar -xf elasticsearch.tar.gz \
-  && ls -lah \
-  && mv elasticsearch-$ES_VERSION /elasticsearch \
-  && adduser -DH -s /sbin/nologin elasticsearch \
-  && echo "===> Creating Elasticsearch Paths..." \
-  && for path in \
-  	/elasticsearch/config \
-  	/elasticsearch/config/scripts \
-  	/elasticsearch/plugins \
-  ; do \
-  mkdir -p "$path"; \
-  chown -R elasticsearch:elasticsearch "$path"; \
-  done \
-  && rm -rf /tmp/* \
-  && apk del --purge .build-deps
-
-ENV PATH /elasticsearch/bin:$PATH
-
-WORKDIR /elasticsearch
-
 # Copy configuration
-COPY config /elasticsearch/config
+COPY config /usr/share/elasticsearch/config
 
 # Copy run script
 COPY run.sh /
+RUN set -ex; \
+	\
+	yum -y install epel-release; \
+	yum -y install wget dpkg; \
+	\
+	dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
+	wget -O /usr/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch"; \
+	wget -O /tmp/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc"; \
+	\
+# verify the signature
+	export GNUPGHOME="$(mktemp -d)"; \
+	gpg --keyserver ha.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
+	gpg --batch --verify /tmp/gosu.asc /usr/bin/gosu; \
+	rm -r "$GNUPGHOME" /tmp/gosu.asc; \
+	\
+	chmod +x /usr/bin/gosu; \
+# verify that the binary works
+	gosu nobody true; \
+	\
+	yum -y remove wget dpkg; \
+	yum clean all
 
 # Set environment variables defaults
 ENV ES_JAVA_OPTS "-Xms512m -Xmx512m"
