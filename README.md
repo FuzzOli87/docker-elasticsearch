@@ -6,10 +6,7 @@ Ready to use, lean and highly configurable Elasticsearch container image.
 
 ## Current software
 
-* OpenJDK JRE 8u151
-* Elasticsearch 6.3.0
-
-**Note:** `x-pack-ml` module is forcibly disabled as it's not supported on Alpine Linux.
+* Elasticsearch 6.3.1
 
 ## Run
 
